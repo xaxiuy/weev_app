@@ -1,9 +1,6 @@
-﻿import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 // Podés dejar este import; ya no lo usamos en web, pero servirá después en Android/iOS
-import 'package:google_sign_in/google_sign_in.dart';
-
 class WeevLoginScreen extends StatefulWidget {
   const WeevLoginScreen({super.key});
 
@@ -333,3 +330,5 @@ class _WeevLoginScreenState extends State<WeevLoginScreen> {
     );
   }
 }
+
+

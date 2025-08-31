@@ -1,12 +1,11 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'profile_edit_screen.dart';
 
 /// Pantalla principal después del login.
-/// Top bar "Weev", bottom bar con 5 ítems:
-/// Inicio · Descubrir · Wallet · Perfil · Swipe
-/// Home completo: historias estilo IG + feed de activaciones.
+/// Tabs: Inicio · Descubrir · Wallet · Perfil · Swipe
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
-
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -18,56 +17,27 @@ class _HomeScreenState extends State<HomeScreen> {
     const _HomeTab(),
     const _StubPage(title: 'Descubrir (próximamente)'),
     const _StubPage(title: 'Wallet (próximamente)'),
-    const _StubPage(title: 'Perfil (próximamente)'),
-    const _StubPage(title: 'Swipe (próximamente)'),
+    const _ProfileTab(), // Perfil real
+    const _SwipeTab(),   // Swipe demo
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        centerTitle: true,
-        elevation: 0,
-        title: const Text(
-          'Weev',
-          style: TextStyle(fontWeight: FontWeight.w700),
-        ),
+        centerTitle: true, elevation: 0,
+        title: const Text('Weev', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: _pages[_index],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
-          // Casa = Home
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Inicio',
-          ),
-          // Lupa = Descubrir actividades de marcas/usuarios
-          NavigationDestination(
-            icon: Icon(Icons.search_outlined),
-            selectedIcon: Icon(Icons.search),
-            label: 'Descubrir',
-          ),
-          // Wallet = tarjetas/descuentos
-          NavigationDestination(
-            icon: Icon(Icons.account_balance_wallet_outlined),
-            selectedIcon: Icon(Icons.account_balance_wallet),
-            label: 'Wallet',
-          ),
-          // Perfil
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Perfil',
-          ),
-          // Swipe (tipo Tinder)
-          NavigationDestination(
-            icon: Icon(Icons.swap_horiz),
-            selectedIcon: Icon(Icons.swap_horiz),
-            label: 'Swipe',
-          ),
+          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Inicio'),
+          NavigationDestination(icon: Icon(Icons.search_outlined), selectedIcon: Icon(Icons.search), label: 'Descubrir'),
+          NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
+          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Perfil'),
+          NavigationDestination(icon: Icon(Icons.swap_horiz), selectedIcon: Icon(Icons.swap_horiz), label: 'Swipe'),
         ],
       ),
     );
@@ -77,13 +47,11 @@ class _HomeScreenState extends State<HomeScreen> {
 /// ===================== HOME TAB =====================
 class _HomeTab extends StatefulWidget {
   const _HomeTab();
-
   @override
   State<_HomeTab> createState() => _HomeTabState();
 }
 
 class _HomeTabState extends State<_HomeTab> {
-  // Historias demo
   final List<_StoryData> stories = [
     _StoryData(name: 'Tu historia', imageUrl: 'https://i.pravatar.cc/150?img=68', isYou: true),
     _StoryData(name: 'OMODA', imageUrl: 'https://i.pravatar.cc/150?img=12'),
@@ -94,34 +62,16 @@ class _HomeTabState extends State<_HomeTab> {
     _StoryData(name: 'Top Pádel', imageUrl: 'https://i.pravatar.cc/150?img=9'),
   ];
 
-  // Feed demo
   final List<_PostData> posts = [
-    _PostData(
-      brand: 'OMODA',
-      subtitle: 'Nueva activación en WTC',
-      imageUrl: 'https://picsum.photos/seed/omoda/900/600',
-      cta: 'Ver activación',
-    ),
-    _PostData(
-      brand: 'JAECOO',
-      subtitle: 'Beneficio 2x1 weekend',
-      imageUrl: 'https://picsum.photos/seed/jaecoo/900/600',
-      cta: 'Ver beneficio',
-    ),
-    _PostData(
-      brand: 'ZEEKR',
-      subtitle: 'Test drive VIP',
-      imageUrl: 'https://picsum.photos/seed/zeekr/900/600',
-      cta: 'Reservar cupo',
-    ),
+    _PostData(brand: 'OMODA', subtitle: 'Nueva activación en WTC', imageUrl: 'https://picsum.photos/seed/omoda/900/600', cta: 'Ver activación'),
+    _PostData(brand: 'JAECOO', subtitle: 'Beneficio 2x1 weekend', imageUrl: 'https://picsum.photos/seed/jaecoo/900/600', cta: 'Ver beneficio'),
+    _PostData(brand: 'ZEEKR', subtitle: 'Test drive VIP', imageUrl: 'https://picsum.photos/seed/zeekr/900/600', cta: 'Reservar cupo'),
   ];
 
   Future<void> _onRefresh() async {
     await Future<void>.delayed(const Duration(milliseconds: 800));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Feed actualizado')),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Feed actualizado')));
   }
 
   @override
@@ -130,7 +80,6 @@ class _HomeTabState extends State<_HomeTab> {
       onRefresh: _onRefresh,
       child: CustomScrollView(
         slivers: [
-          // Historias
           SliverToBoxAdapter(
             child: SizedBox(
               height: 112,
@@ -143,7 +92,6 @@ class _HomeTabState extends State<_HomeTab> {
               ),
             ),
           ),
-          // Feed
           SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, i) => _PostCard(data: posts[i]),
@@ -157,7 +105,6 @@ class _HomeTabState extends State<_HomeTab> {
   }
 }
 
-/// Story ring con borde degradado (estilo IG)
 class _StoryRing extends StatelessWidget {
   const _StoryRing({required this.data});
   final _StoryData data;
@@ -165,40 +112,24 @@ class _StoryRing extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = Text(
-      data.name,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
+      data.name, maxLines: 1, overflow: TextOverflow.ellipsis,
       style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
       textAlign: TextAlign.center,
     );
 
     final ring = Container(
-      width: 74,
-      height: 74,
+      width: 74, height: 74,
       decoration: const BoxDecoration(
         shape: BoxShape.circle,
-        gradient: SweepGradient(
-          colors: [
-            Color(0xFFFD1D1D), // rojo
-            Color(0xFFFCAF45), // naranja
-            Color(0xFF833AB4), // violeta
-            Color(0xFFFD1D1D),
-          ],
-        ),
+        gradient: SweepGradient(colors: [Color(0xFFFD1D1D), Color(0xFFFCAF45), Color(0xFF833AB4), Color(0xFFFD1D1D)]),
       ),
       child: Padding(
         padding: const EdgeInsets.all(3),
         child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            shape: BoxShape.circle,
-            border: Border.all(color: Color(0xFFE5E7EB), width: 1),
-          ),
+          decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: Color(0xFFE5E7EB), width: 1)),
           child: Padding(
             padding: const EdgeInsets.all(2),
-            child: ClipOval(
-              child: Image.network(data.imageUrl, fit: BoxFit.cover),
-            ),
+            child: ClipOval(child: Image.network(data.imageUrl, fit: BoxFit.cover)),
           ),
         ),
       ),
@@ -207,26 +138,21 @@ class _StoryRing extends StatelessWidget {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Stack(
-          children: [
-            ring,
-            if (data.isYou)
-              Positioned(
-                bottom: 2,
-                right: 2,
-                child: Container(
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
-                  ),
-                  child: const Icon(Icons.add, size: 14, color: Colors.white),
+        Stack(children: [
+          ring,
+          if (data.isYou)
+            Positioned(
+              bottom: 2, right: 2,
+              child: Container(
+                width: 20, height: 20,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary, shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
                 ),
+                child: const Icon(Icons.add, size: 14, color: Colors.white),
               ),
-          ],
-        ),
+            ),
+        ]),
         const SizedBox(height: 6),
         SizedBox(width: 74, child: label),
       ],
@@ -234,7 +160,6 @@ class _StoryRing extends StatelessWidget {
   }
 }
 
-/// Card de publicación / activación
 class _PostCard extends StatelessWidget {
   const _PostCard({required this.data});
   final _PostData data;
@@ -242,24 +167,19 @@ class _PostCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            leading: CircleAvatar(
-              backgroundImage: NetworkImage('https://api.dicebear.com/7.x/initials/svg?seed=${data.brand}'),
-            ),
+            leading: CircleAvatar(backgroundImage: NetworkImage('https://api.dicebear.com/7.x/initials/svg?seed=${data.brand}')),
             title: Text(data.brand, style: const TextStyle(fontWeight: FontWeight.w700)),
             subtitle: Text(data.subtitle),
             trailing: IconButton(icon: const Icon(Icons.more_horiz), onPressed: () {}),
           ),
-          // Imagen
           AspectRatio(
             aspectRatio: 16 / 10,
             child: ClipRRect(
@@ -267,7 +187,6 @@ class _PostCard extends StatelessWidget {
               child: Image.network(data.imageUrl, fit: BoxFit.cover),
             ),
           ),
-          // Acciones
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
@@ -282,7 +201,6 @@ class _PostCard extends StatelessWidget {
               ],
             ),
           ),
-          // CTA
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             child: FilledButton.icon(
@@ -290,8 +208,7 @@ class _PostCard extends StatelessWidget {
               icon: const Icon(Icons.chevron_right),
               label: Text(data.cta),
               style: FilledButton.styleFrom(
-                backgroundColor: cs.primary,
-                foregroundColor: cs.onPrimary,
+                backgroundColor: cs.primary, foregroundColor: cs.onPrimary,
                 minimumSize: const Size(double.infinity, 44),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
@@ -303,35 +220,266 @@ class _PostCard extends StatelessWidget {
   }
 }
 
-/// ===================== MODELOS (demo) =====================
-class _StoryData {
-  final String name;
-  final String imageUrl;
-  final bool isYou;
-  _StoryData({required this.name, required this.imageUrl, this.isYou = false});
-}
+/// ===================== PERFIL TAB =====================
+class _ProfileTab extends StatelessWidget {
+  const _ProfileTab();
 
-class _PostData {
-  final String brand;
-  final String subtitle;
-  final String imageUrl;
-  final String cta;
-  _PostData({required this.brand, required this.subtitle, required this.imageUrl, required this.cta});
-}
-
-/// ===================== STUBS =====================
-class _StubPage extends StatelessWidget {
-  const _StubPage({required this.title});
-  final String title;
+  String _initials(String? nameOrEmail) {
+    final s = (nameOrEmail ?? '').trim();
+    if (s.isEmpty) return 'U';
+    final parts = s.split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      return (parts[0].isNotEmpty ? parts[0][0] : 'U').toUpperCase() +
+          (parts[1].isNotEmpty ? parts[1][0] : '');
+    }
+    return s[0].toUpperCase();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        title,
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return const Center(child: Text('No hay sesión activa'));
+
+    final name = user.displayName ?? '';
+    final email = user.email ?? '';
+    final photo = user.photoURL;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      children: [
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 36,
+                  backgroundImage: photo != null ? NetworkImage(photo) : null,
+                  child: photo == null ? Text(_initials(name.isNotEmpty ? name : email)) : null,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(name.isNotEmpty ? name : 'Usuario Weev',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 4),
+                    Text(email, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.black54)),
+                  ]),
+                ),
+                FilledButton.icon(
+                  icon: const Icon(Icons.edit),
+                  label: const Text('Editar'),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ProfileEditScreen()),
+                  ),
+                )
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: Column(children: [
+            ListTile(leading: const Icon(Icons.fingerprint), title: const Text('UID'), subtitle: Text(user.uid)),
+            const Divider(height: 0),
+            ListTile(
+              leading: const Icon(Icons.verified_user_outlined),
+              title: const Text('Email verificado'),
+              subtitle: Text(user.emailVerified ? 'Sí' : 'No'),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 12),
+        FilledButton.tonalIcon(
+          icon: const Icon(Icons.logout), label: const Text('Cerrar sesión'),
+          onPressed: () async { await FirebaseAuth.instance.signOut(); },
+        ),
+      ],
+    );
+  }
+}
+
+/// ===================== SWIPE TAB (demo) =====================
+class _SwipeTab extends StatefulWidget {
+  const _SwipeTab();
+  @override
+  State<_SwipeTab> createState() => _SwipeTabState();
+}
+
+class _SwipeTabState extends State<_SwipeTab> {
+  final List<_SwipeItem> _queue = [
+    _SwipeItem(id: '1', brand: 'Weev x OMODA', title: 'Campera Tech 3L', imageUrl: 'https://picsum.photos/seed/campera/1000/1200', tags: ['impermeable', 'windproof', 'UR']),
+    _SwipeItem(id: '2', brand: 'Weev x JAECOO', title: 'Sneakers Urbanos', imageUrl: 'https://picsum.photos/seed/sneakers/1000/1200', tags: ['vegan', 'city', 'comfort']),
+    _SwipeItem(id: '3', brand: 'Weev x ZEEKR', title: 'Buzo Oversize', imageUrl: 'https://picsum.photos/seed/buzo/1000/1200', tags: ['soft', 'casual']),
+    _SwipeItem(id: '4', brand: 'Weev x XPENG', title: 'Tech Tee', imageUrl: 'https://picsum.photos/seed/tee/1000/1200', tags: ['dryfit', 'training']),
+  ];
+  final List<_SwipeItem> _liked = [];
+  final List<_SwipeItem> _passed = [];
+
+  void _onLike() { if (_queue.isEmpty) return; setState(() => _liked.add(_queue.removeAt(0))); }
+  void _onNope() { if (_queue.isEmpty) return; setState(() => _passed.add(_queue.removeAt(0))); }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_queue.isEmpty) {
+      return Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.check_circle_outline, size: 64),
+          const SizedBox(height: 8),
+          const Text('No hay más por hoy'),
+          const SizedBox(height: 16),
+          FilledButton(onPressed: () { setState(() { _queue.addAll(_liked); _queue.addAll(_passed); _liked.clear(); _passed.clear(); }); }, child: const Text('Reiniciar demo')),
+        ]),
+      );
+    }
+
+    final visible = _queue.take(3).toList();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      child: Column(
+        children: [
+          Expanded(
+            child: Stack(
+              children: [
+                for (int i = visible.length - 1; i >= 0; i--)
+                  _buildStackedCard(item: visible[i], isTop: i == 0, indexFromTop: i),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _roundAction(context, icon: Icons.close, semantic: 'Nope', onTap: _onNope),
+              _roundAction(context, icon: Icons.favorite, semantic: 'Like', onTap: _onLike),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text('Likes: ${_liked.length}  ·  Pasados: ${_passed.length}', style: Theme.of(context).textTheme.labelMedium),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStackedCard({required _SwipeItem item, required bool isTop, required int indexFromTop}) {
+    final double scale = 1 - (indexFromTop * 0.04);
+    final double topOffset = indexFromTop * 12.0;
+    final card = _SwipeCard(item: item);
+
+    if (!isTop) {
+      return Positioned.fill(top: topOffset, child: Transform.scale(scale: scale, child: card));
+    }
+
+    return Positioned.fill(
+      top: topOffset,
+      child: Dismissible(
+        key: ValueKey(item.id),
+        direction: DismissDirection.horizontal,
+        onDismissed: (dir) { if (dir == DismissDirection.startToEnd) { _onLike(); } else { _onNope(); } },
+        background: _swipeBackground(align: Alignment.centerLeft, icon: Icons.favorite, color: Colors.green.withValues(alpha: 0.15), iconColor: Colors.green, label: 'LIKE'),
+        secondaryBackground: _swipeBackground(align: Alignment.centerRight, icon: Icons.close, color: Colors.red.withValues(alpha: 0.15), iconColor: Colors.red, label: 'NOPE'),
+        child: Transform.scale(scale: scale, child: card),
+      ),
+    );
+  }
+
+  Widget _swipeBackground({required Alignment align, required IconData icon, required Color color, required Color iconColor, required String label}) {
+    return Container(
+      alignment: align,
+      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(16)),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 28, color: iconColor),
+        const SizedBox(width: 6),
+        Text(label, style: TextStyle(fontWeight: FontWeight.w800, color: iconColor, letterSpacing: 1.2)),
+      ]),
+    );
+  }
+
+  Widget _roundAction(BuildContext context, {required IconData icon, required String semantic, required VoidCallback onTap}) {
+    return Semantics(
+      button: true, label: semantic,
+      child: InkResponse(
+        onTap: onTap, radius: 36,
+        child: Container(
+          width: 64, height: 64,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Theme.of(context).colorScheme.surface,
+            boxShadow: const [BoxShadow(blurRadius: 10, spreadRadius: 0, offset: Offset(0, 4), color: Color(0x1A000000))],
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: Icon(icon, size: 32),
+        ),
       ),
     );
   }
 }
+
+class _SwipeCard extends StatelessWidget {
+  const _SwipeCard({required this.item});
+  final _SwipeItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0, margin: EdgeInsets.zero, clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Column(
+        children: [
+          Expanded(
+            child: Stack(fit: StackFit.expand, children: [
+              Image.network(item.imageUrl, fit: BoxFit.cover),
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  height: 140,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(begin: Alignment(0, -0.2), end: Alignment.bottomCenter, colors: [Colors.transparent, Colors.black54]),
+                  ),
+                ),
+              ),
+            ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(item.brand, style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700, color: Colors.black87)),
+              const SizedBox(height: 4),
+              Text(item.title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8, runSpacing: -6,
+                children: item.tags.map((t) => Chip(label: Text(t), visualDensity: VisualDensity.compact, side: const BorderSide(color: Color(0xFFE5E7EB)))).toList(),
+              ),
+            ]),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SwipeItem {
+  final String id; final String brand; final String title; final String imageUrl; final List<String> tags;
+  _SwipeItem({required this.id, required this.brand, required this.title, required this.imageUrl, required this.tags});
+}
+
+/// ====== MODELOS HOME ======
+class _StoryData { final String name; final String imageUrl; final bool isYou; _StoryData({required this.name, required this.imageUrl, this.isYou = false}); }
+class _PostData { final String brand; final String subtitle; final String imageUrl; final String cta; _PostData({required this.brand, required this.subtitle, required this.imageUrl, required this.cta}); }
+
+/// ====== STUB ======
+class _StubPage extends StatelessWidget {
+  const _StubPage({required this.title});
+  final String title;
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+  );
+}
+
+
