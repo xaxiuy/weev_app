@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';   // generado por flutterfire configure
 
-void main() => runApp(const WeevApp());
+import 'weev_login_screen.dart'; // tu pantalla de login
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  runApp(const WeevApp());
+}
 
 class WeevApp extends StatelessWidget {
   const WeevApp({super.key});
@@ -30,6 +40,7 @@ class WeevApp extends StatelessWidget {
     );
   }
 }
+
 
 /// Tokens básicos de marca
 class WeevTokens {
