@@ -1,54 +1,113 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class WalletService {
-  WalletService._();
+class WalletState {
+  final String? activeCardId;
+  final Set<String> unlocked;
 
-  static final FirebaseFirestore _db = FirebaseFirestore.instance;
+  const WalletState({
+    required this.activeCardId,
+    required this.unlocked,
+  });
 
-  /// Doc: users/{uid}/wallet/state
-  static DocumentReference<Map<String, dynamic>> _stateDoc(String uid) {
-    return _db.collection('users').doc(uid).collection('wallet').doc('state');
-  }
-
-  /// Subcolección de usos: users/{uid}/wallet/state/uses/{autoId}
-  static CollectionReference<Map<String, dynamic>> _usesCol(String uid) {
-    return _stateDoc(uid).collection('uses');
-  }
-
-  /// Stream del ID de la tarjeta activa (o null si no hay).
-  static Stream<String?> activeCardIdStream(String uid) {
-    return _stateDoc(uid).snapshots().map((snap) {
-      final data = snap.data();
-      return data == null ? null : (data['activeCardId'] as String?);
-    });
-  }
-
-  /// Setea la tarjeta activa. Si [cardId] es null, desactiva.
-  static Future<void> setActiveCardId(String uid, String? cardId) {
-    return _stateDoc(uid).set(
-      {
-        'activeCardId': cardId,
-        'updatedAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
+  factory WalletState.fromMap(Map<String, dynamic>? data) {
+    final unlockedList = (data?['unlocked'] as List?)?.cast<String>() ?? <String>[];
+    return WalletState(
+      activeCardId: data?['activeCardId'] as String?,
+      unlocked: unlockedList.toSet(),
     );
   }
 
-  /// Registra un uso (cuando el usuario muestra el código).
-  static Future<void> logUse(String uid, String cardId, {String? merchant}) {
-    return _usesCol(uid).add({
+  Map<String, dynamic> toMap() => {
+        'activeCardId': activeCardId,
+        'unlocked': unlocked.toList(),
+      };
+}
+
+class WalletService {
+  static final _db = FirebaseFirestore.instance;
+
+  static DocumentReference<Map<String, dynamic>> _stateDoc(String uid) =>
+      _db.collection('users').doc(uid).collection('wallet').doc('state');
+
+  /// Stream en vivo del estado de la wallet del usuario
+  static Stream<WalletState> walletStateStream(String uid) {
+    return _stateDoc(uid).snapshots().map(
+      (snap) => WalletState.fromMap(snap.data()),
+    );
+  }
+
+  /// Establece la tarjeta activa o la desactiva (null)
+  static Future<void> setActiveCardId(String uid, String? cardId) async {
+    await _stateDoc(uid).set({'activeCardId': cardId}, SetOptions(merge: true));
+  }
+
+  /// Registra un uso (opcional, para historial/analytics)
+  static Future<void> registerUse(String uid, String cardId) async {
+    final usesCol = _db
+        .collection('users')
+        .doc(uid)
+        .collection('wallet')
+        .doc('uses')
+        .collection('items');
+    await usesCol.add({
       'cardId': cardId,
-      'merchant': merchant, // opcional
-      'at': FieldValue.serverTimestamp(),
+      'ts': FieldValue.serverTimestamp(),
     });
   }
 
-  /// Últimos N usos (para mostrar historial).
-  static Stream<List<Map<String, dynamic>>> lastUsesStream(String uid, {int limit = 20}) {
-    return _usesCol(uid)
-        .orderBy('at', descending: true)
-        .limit(limit)
-        .snapshots()
-        .map((q) => q.docs.map((d) => {'id': d.id, ...d.data()}).toList());
+  /// Canjea un código y desbloquea tarjetas (transacción)
+  static Future<WalletRedeemResult> redeemActivationCode(String uid, String code) async {
+    final clean = code.trim();
+    if (clean.isEmpty) {
+      return WalletRedeemResult(false, message: 'Código vacío');
+    }
+
+    final codeRef = _db.collection('activation_codes').doc(clean);
+    final snap = await codeRef.get();
+    if (!snap.exists) {
+      return WalletRedeemResult(false, message: 'Código inválido');
+    }
+
+    return await _db.runTransaction<WalletRedeemResult>((tx) async {
+      final fresh = await tx.get(codeRef);
+      if (!fresh.exists) {
+        return WalletRedeemResult(false, message: 'Código inválido');
+      }
+      final data = fresh.data() as Map<String, dynamic>;
+      final usedBy = data['usedBy'];
+      final List<String> cardIds = (data['cardIds'] as List?)?.cast<String>() ?? <String>[];
+
+      if (usedBy != null && usedBy != uid) {
+        return WalletRedeemResult(false, message: 'Este código ya fue usado');
+      }
+      if (cardIds.isEmpty) {
+        return WalletRedeemResult(false, message: 'El código no tiene tarjetas asociadas');
+      }
+
+      // Marcar código como usado por este usuario
+      tx.set(codeRef, {
+        'usedBy': uid,
+        'usedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // Agregar tarjetas a "unlocked"
+      final stateRef = _stateDoc(uid);
+      final stateSnap = await tx.get(stateRef);
+      final current = (stateSnap.data()?['unlocked'] as List?)?.cast<String>() ?? <String>[];
+      final updated = {...current, ...cardIds}.toList();
+
+      tx.set(stateRef, {'unlocked': updated}, SetOptions(merge: true));
+
+      return WalletRedeemResult(true,
+          message: 'Código canjeado', unlockedCardIds: cardIds);
+    });
   }
+}
+
+class WalletRedeemResult {
+  final bool ok;
+  final String message;
+  final List<String> unlockedCardIds;
+
+  WalletRedeemResult(this.ok, {required this.message, this.unlockedCardIds = const []});
 }

@@ -1,8 +1,10 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
 import 'profile_edit_screen.dart';
 import 'wallet_service.dart';
 import 'wallet_code_screen.dart';
+import 'activation_screen.dart';
 
 /// Pantalla principal con 5 tabs:
 /// Inicio · Descubrir · Wallet · Perfil · Swipe
@@ -18,7 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final List<Widget> _pages = [
     const _HomeTab(),
     const _StubPage(title: 'Descubrir (próximamente)'),
-    const _WalletTab(), // Wallet con persistencia Firestore
+    const _WalletTab(),
     const _ProfileTab(),
     const _SwipeTab(),
   ];
@@ -30,6 +32,17 @@ class _HomeScreenState extends State<HomeScreen> {
         centerTitle: true,
         elevation: 0,
         title: const Text('Weev', style: TextStyle(fontWeight: FontWeight.w700)),
+        actions: [
+          IconButton(
+            tooltip: 'Activar artículo',
+            icon: const Icon(Icons.add_circle_outline),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ActivationScreen()),
+              );
+            },
+          ),
+        ],
       ),
       body: _pages[_index],
       bottomNavigationBar: NavigationBar(
@@ -233,7 +246,7 @@ class _PostCard extends StatelessWidget {
 }
 
 ////////////////////////////////////////////////////////////////
-/// WALLET (apiladas + activar) con persistencia Firestore
+/// WALLET (bloqueadas/desbloqueadas + activar)
 ////////////////////////////////////////////////////////////////
 class _WalletTab extends StatefulWidget {
   const _WalletTab();
@@ -242,32 +255,11 @@ class _WalletTab extends StatefulWidget {
 }
 
 class _WalletTabState extends State<_WalletTab> {
-  // Datos de ejemplo: marca, color, logo
   final List<_WalletCardData> _allCards = [
-    _WalletCardData(
-      id: 'omoda',
-      brand: 'OMODA',
-      color: const Color(0xFF111827),
-      logoUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=OMODA',
-    ),
-    _WalletCardData(
-      id: 'jaecoo',
-      brand: 'JAECOO',
-      color: const Color(0xFF0EA5E9),
-      logoUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=JAECOO',
-    ),
-    _WalletCardData(
-      id: 'zeekr',
-      brand: 'ZEEKR',
-      color: const Color(0xFF9333EA),
-      logoUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=ZEEKR',
-    ),
-    _WalletCardData(
-      id: 'xpeng',
-      brand: 'XPENG',
-      color: const Color(0xFF10B981),
-      logoUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=XPENG',
-    ),
+    _WalletCardData(id: 'omoda', brand: 'OMODA', color: const Color(0xFF111827), logoUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=OMODA'),
+    _WalletCardData(id: 'jaecoo', brand: 'JAECOO', color: const Color(0xFF0EA5E9), logoUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=JAECOO'),
+    _WalletCardData(id: 'zeekr', brand: 'ZEEKR', color: const Color(0xFF9333EA), logoUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=ZEEKR'),
+    _WalletCardData(id: 'xpeng', brand: 'XPENG', color: const Color(0xFF10B981), logoUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=XPENG'),
   ];
 
   String _filter = 'Todas';
@@ -293,25 +285,22 @@ class _WalletTabState extends State<_WalletTab> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Text(
-            'Iniciá sesión para usar tu Wallet',
-            style: Theme.of(context).textTheme.titleMedium,
-            textAlign: TextAlign.center,
-          ),
+          child: Text('Iniciá sesión para usar tu Wallet', style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.center),
         ),
       );
     }
 
     final uid = user.uid;
 
-    return StreamBuilder<String?>(
-      stream: WalletService.activeCardIdStream(uid),
+    return StreamBuilder<WalletState>(
+      stream: WalletService.walletStateStream(uid),
       builder: (context, snap) {
-        final activeId = snap.data;
+        final state = snap.data ?? const WalletState(activeCardId: null, unlocked: <String>{});
+        final activeId = state.activeCardId;
+        final unlocked = state.unlocked;
 
         return Column(
           children: [
-            // Filtros por marca
             SizedBox(
               height: 56,
               child: ListView(
@@ -327,8 +316,6 @@ class _WalletTabState extends State<_WalletTab> {
                 ],
               ),
             ),
-
-            // Pila vertical estilo Wallet (PageView vertical)
             Expanded(
               child: PageView.builder(
                 controller: _pageController,
@@ -337,21 +324,34 @@ class _WalletTabState extends State<_WalletTab> {
                 itemBuilder: (context, index) {
                   final card = _filtered[index];
                   final isActive = activeId == card.id;
+                  final isUnlocked = unlocked.contains(card.id);
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
                     child: _WalletCard(
                       data: card,
                       isActive: isActive,
-                      onActivate: () => WalletService.setActiveCardId(uid, card.id),
-                      onDeactivate: () => WalletService.setActiveCardId(uid, null),
+                      isUnlocked: isUnlocked,
+                      onUnlock: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ActivationScreen())),
+                      onActivate: isUnlocked ? () => WalletService.setActiveCardId(uid, card.id) : null,
+                      onDeactivate: isUnlocked ? () => WalletService.setActiveCardId(uid, null) : null,
+                      onShowCode: isUnlocked
+                          ? () {
+                              Navigator.of(context).push(MaterialPageRoute(
+                                builder: (_) => WalletCodeScreen(
+                                  cardId: card.id,
+                                  brand: card.brand,
+                                  color: card.color,
+                                  logoUrl: card.logoUrl,
+                                ),
+                              ));
+                            }
+                          : null,
                     ),
                   );
                 },
               ),
             ),
-
-            // Info “apiladas”
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
@@ -380,26 +380,27 @@ class _WalletCardData {
   final String brand;
   final Color color;
   final String logoUrl;
-  const _WalletCardData({
-    required this.id,
-    required this.brand,
-    required this.color,
-    required this.logoUrl,
-  });
+  const _WalletCardData({required this.id, required this.brand, required this.color, required this.logoUrl});
 }
 
 class _WalletCard extends StatelessWidget {
   const _WalletCard({
     required this.data,
     required this.isActive,
+    required this.isUnlocked,
+    required this.onUnlock,
     required this.onActivate,
     required this.onDeactivate,
+    required this.onShowCode,
   });
 
   final _WalletCardData data;
   final bool isActive;
-  final VoidCallback onActivate;
-  final VoidCallback onDeactivate;
+  final bool isUnlocked;
+  final VoidCallback onUnlock;
+  final VoidCallback? onActivate;
+  final VoidCallback? onDeactivate;
+  final VoidCallback? onShowCode;
 
   Color _darken(Color c, [double amount = 0.12]) {
     final hsl = HSLColor.fromColor(c);
@@ -415,137 +416,106 @@ class _WalletCard extends StatelessWidget {
       elevation: isActive ? 8 : 2,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [bg, bg2],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+      child: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [bg, bg2], begin: Alignment.topLeft, end: Alignment.bottomRight),
+            ),
           ),
-        ),
-        child: Stack(
-          children: [
-            // Marca en watermark
-            Positioned(
-              right: -20,
-              bottom: -10,
-              child: Opacity(
-                opacity: 0.12,
-                child: Text(
-                  data.brand,
-                  style: const TextStyle(
-                    fontSize: 72,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 2,
-                    color: Colors.white,
-                  ),
-                ),
+          Positioned(
+            right: -20,
+            bottom: -10,
+            child: Opacity(
+              opacity: 0.12,
+              child: Text(
+                data.brand,
+                style: const TextStyle(fontSize: 72, fontWeight: FontWeight.w900, letterSpacing: 2, color: Colors.white),
               ),
             ),
-
-            // Contenido
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Header: logo + marca + estado
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      CircleAvatar(
-                        radius: 22,
-                        backgroundColor: Colors.white.withValues(alpha: 0.2),
-                        backgroundImage: NetworkImage(data.logoUrl),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          data.brand,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      if (isActive) const _ActivePill(),
-                    ],
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: Colors.white.withValues(alpha: 0.2),
+                    backgroundImage: NetworkImage(data.logoUrl),
                   ),
-                  const SizedBox(height: 24),
-
-                  // “Tarjeta” visual
-                  Container(
-                    height: 140,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Tarjeta de beneficios', style: TextStyle(color: Colors.white70)),
-                              SizedBox(height: 8),
-                              Text(
-                                'Activá para usar en el comercio',
-                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const Icon(Icons.credit_card, color: Colors.white),
-                      ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      data.brand,
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white),
                     ),
                   ),
-
-                  const Spacer(),
-
-                  // Acciones
-                  Row(
-                    children: [
-                      if (!isActive)
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: onActivate,
-                            child: const Text('Activar'),
-                          ),
-                        )
-                      else ...[
-                        Expanded(
-                          child: FilledButton.tonal(
-                            onPressed: onDeactivate,
-                            child: const Text('Desactivar'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: () {
-                              Navigator.of(context).push(MaterialPageRoute(
-                                builder: (_) => WalletCodeScreen(
-                                  cardId: data.id,
-                                  brand: data.brand,
-                                  color: data.color,
-                                  logoUrl: data.logoUrl,
-                                ),
-                              ));
-                            },
-                            child: const Text('Mostrar código'),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                  if (isUnlocked && isActive) const _ActivePill(),
+                  if (!isUnlocked)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.lock, size: 16, color: Colors.white),
+                          SizedBox(width: 6),
+                          Text('Bloqueada', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
                 ],
               ),
-            ),
-          ],
-        ),
+              const SizedBox(height: 24),
+              Container(
+                height: 140,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Tarjeta de beneficios', style: TextStyle(color: Colors.white70)),
+                          SizedBox(height: 8),
+                          Text('Activá para usar en el comercio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.credit_card, color: Colors.white),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Row(
+                children: [
+                  if (!isUnlocked)
+                    Expanded(child: FilledButton(onPressed: onUnlock, child: const Text('Desbloquear')))
+                  else if (!isActive) ...[
+                    Expanded(child: FilledButton(onPressed: onActivate, child: const Text('Activar'))),
+                    const SizedBox(width: 8),
+                    Expanded(child: FilledButton.tonal(onPressed: onShowCode, child: const Text('Mostrar código'))),
+                  ] else ...[
+                    Expanded(child: FilledButton.tonal(onPressed: onDeactivate, child: const Text('Desactivar'))),
+                    const SizedBox(width: 8),
+                    Expanded(child: FilledButton(onPressed: onShowCode, child: const Text('Mostrar código'))),
+                  ],
+                ],
+              ),
+            ]),
+          ),
+        ],
       ),
     );
   }
@@ -615,24 +585,16 @@ class _ProfileTab extends StatelessWidget {
                 ),
                 const SizedBox(width: 16),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name.isNotEmpty ? name : 'Usuario Weev',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(email, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.black54)),
-                    ],
-                  ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(name.isNotEmpty ? name : 'Usuario Weev', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 4),
+                    Text(email, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.black54)),
+                  ]),
                 ),
                 FilledButton.icon(
                   icon: const Icon(Icons.edit),
                   label: const Text('Editar'),
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const ProfileEditScreen()),
-                  ),
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfileEditScreen())),
                 )
               ],
             ),
@@ -641,25 +603,17 @@ class _ProfileTab extends StatelessWidget {
         const SizedBox(height: 12),
         Card(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Column(
-            children: [
-              ListTile(leading: const Icon(Icons.fingerprint), title: const Text('UID'), subtitle: Text(user.uid)),
-              const Divider(height: 0),
-              ListTile(
-                leading: const Icon(Icons.verified_user_outlined),
-                title: const Text('Email verificado'),
-                subtitle: Text(user.emailVerified ? 'Sí' : 'No'),
-              ),
-            ],
-          ),
+          child: Column(children: [
+            ListTile(leading: const Icon(Icons.fingerprint), title: const Text('UID'), subtitle: Text(user.uid)),
+            const Divider(height: 0),
+            ListTile(leading: const Icon(Icons.verified_user_outlined), title: const Text('Email verificado'), subtitle: Text(user.emailVerified ? 'Sí' : 'No')),
+          ]),
         ),
         const SizedBox(height: 12),
         FilledButton.tonalIcon(
           icon: const Icon(Icons.logout),
           label: const Text('Cerrar sesión'),
-          onPressed: () async {
-            await FirebaseAuth.instance.signOut();
-          },
+          onPressed: () async => FirebaseAuth.instance.signOut(),
         ),
       ],
     );
@@ -925,3 +879,4 @@ class _StubPage extends StatelessWidget {
         ),
       );
 }
+
