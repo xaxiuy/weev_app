@@ -19,3 +19,9 @@ Thumbs.db
 # (Mantenemos Firebase config en el repo para compilar)
 # NO ignoramos: android/app/google-services.json
 # NO ignoramos: ios/Runner/GoogleService-Info.plist
+# Flutter / Dart (extra)
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# IDEs extra
+*.iml
