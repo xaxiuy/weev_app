@@ -1,27 +1,35 @@
-﻿# Flutter / Dart
+﻿# Flutter/Dart
 .dart_tool/
 .packages
-build/
-coverage/
 .pub-cache/
+build/
+**/generated_plugin_registrant.dart
 
-# IDEs
+# Android
+android/.gradle/
+android/local.properties
+android/key.properties
+*.keystore
+*.jks
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/App.framework
+DerivedData/
+
+# Web
+web/.dart_tool/
+
+# IDE
 .vscode/
 .idea/
 
-# SO
-.DS_Store
-Thumbs.db
-
-# Logs
+# Logs / misc
 *.log
-
-# (Mantenemos Firebase config en el repo para compilar)
-# NO ignoramos: android/app/google-services.json
-# NO ignoramos: ios/Runner/GoogleService-Info.plist
-# Flutter / Dart (extra)
-.flutter-plugins
-.flutter-plugins-dependencies
-
-# IDEs extra
 *.iml
+
+# Env
+.env
+*.env
