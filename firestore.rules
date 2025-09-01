@@ -1,0 +1,82 @@
+// v2 Firestore security rules
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -------------------------
+    // Helpers
+    // -------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Verifica si el usuario actual es admin de la marca (doc con ID = uid)
+    function isBrandAdmin(brandId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/brands/$(brandId)/admins/$(request.auth.uid));
+    }
+
+    // -------------------------
+    // Datos por usuario
+    // -------------------------
+    // Wallet del usuario
+    match /users/{uid}/wallet/{docId} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // (Opcional) Códigos de activación guardados en el perfil del usuario
+    match /users/{uid}/activation_codes/{codeId} {
+      allow read, write: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // -------------------------
+    // Marcas
+    // -------------------------
+    match /brands/{brandId} {
+      // Lectura del doc de la marca: cualquier usuario autenticado
+      allow read: if isSignedIn();
+
+      // Actualizar datos de la marca: solo admins de esa marca
+      allow write: if isBrandAdmin(brandId);
+
+      // Subcolección de admins: la app solo necesita leer SU propio doc
+      // para comprobar si es admin. NO permitimos escribir desde el cliente.
+      match /admins/{uid} {
+        allow read: if isSignedIn() && request.auth.uid == uid;
+        allow write: if false;
+      }
+
+      // Subcolecciones administradas por la marca
+      match /products/{docId} {
+        allow read: if isSignedIn();
+        allow write: if isBrandAdmin(brandId);
+      }
+
+      match /stories/{docId} {
+        allow read: if isSignedIn();
+        allow write: if isBrandAdmin(brandId);
+      }
+
+      match /cards/{docId} {
+        allow read: if isSignedIn();
+        allow write: if isBrandAdmin(brandId);
+      }
+
+      match /activationRules/{docId} {
+        allow read: if isSignedIn();
+        allow write: if isBrandAdmin(brandId);
+      }
+    }
+
+    // -------------------------
+    // Eventos (analítica simple)
+    // -------------------------
+    match /events/{eventId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();     // registrar eventos desde la app
+      allow update, delete: if false;    // inmutables desde el cliente
+    }
+  }
+}
+

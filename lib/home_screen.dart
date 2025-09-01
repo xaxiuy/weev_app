@@ -1,10 +1,9 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'profile_edit_screen.dart';
-import 'wallet_service.dart';
-import 'wallet_code_screen.dart';
-import 'activation_screen.dart';
+import 'activation_screen.dart';      // Pantalla para activar códigos (+)
+import 'brand_admin.dart';            // Portal de admin de marca
 
 /// Pantalla principal con 5 tabs:
 /// Inicio · Descubrir · Wallet · Perfil · Swipe
@@ -33,12 +32,13 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         title: const Text('Weev', style: TextStyle(fontWeight: FontWeight.w700)),
         actions: [
+          // Botón + para activar artículos con código
           IconButton(
             tooltip: 'Activar artículo',
             icon: const Icon(Icons.add_circle_outline),
             onPressed: () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ActivationScreen()),
+                MaterialPageRoute(builder: (_) => ActivationScreen()),
               );
             },
           ),
@@ -49,11 +49,26 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Inicio'),
-          NavigationDestination(icon: Icon(Icons.search_outlined), selectedIcon: Icon(Icons.search), label: 'Descubrir'),
-          NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'Wallet'),
-          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Perfil'),
-          NavigationDestination(icon: Icon(Icons.swap_horiz), selectedIcon: Icon(Icons.swap_horiz), label: 'Swipe'),
+          NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: 'Inicio'),
+          NavigationDestination(
+              icon: Icon(Icons.search_outlined),
+              selectedIcon: Icon(Icons.search),
+              label: 'Descubrir'),
+          NavigationDestination(
+              icon: Icon(Icons.account_balance_wallet_outlined),
+              selectedIcon: Icon(Icons.account_balance_wallet),
+              label: 'Wallet'),
+          NavigationDestination(
+              icon: Icon(Icons.person_outline),
+              selectedIcon: Icon(Icons.person),
+              label: 'Perfil'),
+          NavigationDestination(
+              icon: Icon(Icons.swap_horiz),
+              selectedIcon: Icon(Icons.swap_horiz),
+              label: 'Swipe'),
         ],
       ),
     );
@@ -147,7 +162,11 @@ class _StoryRing extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(3),
         child: Container(
-          decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, border: Border.all(color: Color(0xFFE5E7EB), width: 1)),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: Color(0xFFE5E7EB), width: 1),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(2),
             child: ClipOval(child: Image.network(data.imageUrl, fit: BoxFit.cover)),
@@ -246,7 +265,7 @@ class _PostCard extends StatelessWidget {
 }
 
 ////////////////////////////////////////////////////////////////
-/// WALLET (bloqueadas/desbloqueadas + activar)
+/// WALLET (apiladas + activar)
 ////////////////////////////////////////////////////////////////
 class _WalletTab extends StatefulWidget {
   const _WalletTab();
@@ -255,15 +274,39 @@ class _WalletTab extends StatefulWidget {
 }
 
 class _WalletTabState extends State<_WalletTab> {
-  final List<_WalletCardData> _allCards = [
-    _WalletCardData(id: 'omoda', brand: 'OMODA', color: const Color(0xFF111827), logoUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=OMODA'),
-    _WalletCardData(id: 'jaecoo', brand: 'JAECOO', color: const Color(0xFF0EA5E9), logoUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=JAECOO'),
-    _WalletCardData(id: 'zeekr', brand: 'ZEEKR', color: const Color(0xFF9333EA), logoUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=ZEEKR'),
-    _WalletCardData(id: 'xpeng', brand: 'XPENG', color: const Color(0xFF10B981), logoUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=XPENG'),
+  // Datos de ejemplo: marca, color, logo
+  final List<_WalletCardData> _allCards = const [
+    _WalletCardData(
+      id: 'omoda',
+      brand: 'OMODA',
+      color: Color(0xFF111827),
+      logoUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=OMODA',
+    ),
+    _WalletCardData(
+      id: 'jaecoo',
+      brand: 'JAECOO',
+      color: Color(0xFF0EA5E9),
+      logoUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=JAECOO',
+    ),
+    _WalletCardData(
+      id: 'zeekr',
+      brand: 'ZEEKR',
+      color: Color(0xFF9333EA),
+      logoUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=ZEEKR',
+    ),
+    _WalletCardData(
+      id: 'xpeng',
+      brand: 'XPENG',
+      color: Color(0xFF10B981),
+      logoUrl: 'https://api.dicebear.com/7.x/initials/svg?seed=XPENG',
+    ),
   ];
 
   String _filter = 'Todas';
-  late final PageController _pageController = PageController(viewportFraction: 0.88);
+  String? _activeId;
+
+  late final PageController _pageController =
+      PageController(viewportFraction: 0.88);
 
   @override
   void dispose() {
@@ -279,89 +322,58 @@ class _WalletTabState extends State<_WalletTab> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final user = FirebaseAuth.instance.currentUser;
 
-    if (user == null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text('Iniciá sesión para usar tu Wallet', style: Theme.of(context).textTheme.titleMedium, textAlign: TextAlign.center),
+    return Column(
+      children: [
+        // Filtros por marca
+        SizedBox(
+          height: 56,
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            scrollDirection: Axis.horizontal,
+            children: [
+              _brandChip('Todas'),
+              const SizedBox(width: 8),
+              for (final b in _allCards.map((e) => e.brand).toSet()) ...[
+                _brandChip(b),
+                const SizedBox(width: 8),
+              ],
+            ],
+          ),
         ),
-      );
-    }
 
-    final uid = user.uid;
+        // Pila vertical estilo Wallet (PageView vertical)
+        Expanded(
+          child: PageView.builder(
+            controller: _pageController,
+            scrollDirection: Axis.vertical,
+            itemCount: _filtered.length,
+            itemBuilder: (context, index) {
+              final card = _filtered[index];
+              final isActive = _activeId == card.id;
 
-    return StreamBuilder<WalletState>(
-      stream: WalletService.walletStateStream(uid),
-      builder: (context, snap) {
-        final state = snap.data ?? const WalletState(activeCardId: null, unlocked: <String>{});
-        final activeId = state.activeCardId;
-        final unlocked = state.unlocked;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                child: _WalletCard(
+                  data: card,
+                  isActive: isActive,
+                  onActivate: () => setState(() => _activeId = card.id),
+                  onDeactivate: () => setState(() => _activeId = null),
+                ),
+              );
+            },
+          ),
+        ),
 
-        return Column(
-          children: [
-            SizedBox(
-              height: 56,
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                scrollDirection: Axis.horizontal,
-                children: [
-                  _brandChip('Todas'),
-                  const SizedBox(width: 8),
-                  for (final b in _allCards.map((e) => e.brand).toSet()) ...[
-                    _brandChip(b),
-                    const SizedBox(width: 8),
-                  ],
-                ],
-              ),
-            ),
-            Expanded(
-              child: PageView.builder(
-                controller: _pageController,
-                scrollDirection: Axis.vertical,
-                itemCount: _filtered.length,
-                itemBuilder: (context, index) {
-                  final card = _filtered[index];
-                  final isActive = activeId == card.id;
-                  final isUnlocked = unlocked.contains(card.id);
-
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                    child: _WalletCard(
-                      data: card,
-                      isActive: isActive,
-                      isUnlocked: isUnlocked,
-                      onUnlock: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ActivationScreen())),
-                      onActivate: isUnlocked ? () => WalletService.setActiveCardId(uid, card.id) : null,
-                      onDeactivate: isUnlocked ? () => WalletService.setActiveCardId(uid, null) : null,
-                      onShowCode: isUnlocked
-                          ? () {
-                              Navigator.of(context).push(MaterialPageRoute(
-                                builder: (_) => WalletCodeScreen(
-                                  cardId: card.id,
-                                  brand: card.brand,
-                                  color: card.color,
-                                  logoUrl: card.logoUrl,
-                                ),
-                              ));
-                            }
-                          : null,
-                    ),
-                  );
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                'Deslizá verticalmente para ver tus tarjetas',
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(color: cs.outline),
-              ),
-            ),
-          ],
-        );
-      },
+        // Info “apiladas”
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Text(
+            'Deslizá verticalmente para ver tus tarjetas',
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(color: cs.outline),
+          ),
+        ),
+      ],
     );
   }
 
@@ -380,27 +392,26 @@ class _WalletCardData {
   final String brand;
   final Color color;
   final String logoUrl;
-  const _WalletCardData({required this.id, required this.brand, required this.color, required this.logoUrl});
+  const _WalletCardData({
+    required this.id,
+    required this.brand,
+    required this.color,
+    required this.logoUrl,
+  });
 }
 
 class _WalletCard extends StatelessWidget {
   const _WalletCard({
     required this.data,
     required this.isActive,
-    required this.isUnlocked,
-    required this.onUnlock,
     required this.onActivate,
     required this.onDeactivate,
-    required this.onShowCode,
   });
 
   final _WalletCardData data;
   final bool isActive;
-  final bool isUnlocked;
-  final VoidCallback onUnlock;
-  final VoidCallback? onActivate;
-  final VoidCallback? onDeactivate;
-  final VoidCallback? onShowCode;
+  final VoidCallback onActivate;
+  final VoidCallback onDeactivate;
 
   Color _darken(Color c, [double amount = 0.12]) {
     final hsl = HSLColor.fromColor(c);
@@ -416,106 +427,126 @@ class _WalletCard extends StatelessWidget {
       elevation: isActive ? 8 : 2,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: Stack(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [bg, bg2], begin: Alignment.topLeft, end: Alignment.bottomRight),
-            ),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [bg, bg2],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          Positioned(
-            right: -20,
-            bottom: -10,
-            child: Opacity(
-              opacity: 0.12,
-              child: Text(
-                data.brand,
-                style: const TextStyle(fontSize: 72, fontWeight: FontWeight.w900, letterSpacing: 2, color: Colors.white),
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: Colors.white.withValues(alpha: 0.2),
-                    backgroundImage: NetworkImage(data.logoUrl),
+        ),
+        child: Stack(
+          children: [
+            // Marca en watermark
+            Positioned(
+              right: -20,
+              bottom: -10,
+              child: Opacity(
+                opacity: 0.12,
+                child: Text(
+                  data.brand,
+                  style: const TextStyle(
+                    fontSize: 72, fontWeight: FontWeight.w900, letterSpacing: 2, color: Colors.white,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      data.brand,
-                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white),
-                    ),
-                  ),
-                  if (isUnlocked && isActive) const _ActivePill(),
-                  if (!isUnlocked)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.lock, size: 16, color: Colors.white),
-                          SizedBox(width: 6),
-                          Text('Bloqueada', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Container(
-                height: 140,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-                ),
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Tarjeta de beneficios', style: TextStyle(color: Colors.white70)),
-                          SizedBox(height: 8),
-                          Text('Activá para usar en el comercio', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.credit_card, color: Colors.white),
-                  ],
                 ),
               ),
-              const Spacer(),
-              Row(
+            ),
+
+            // Contenido
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (!isUnlocked)
-                    Expanded(child: FilledButton(onPressed: onUnlock, child: const Text('Desbloquear')))
-                  else if (!isActive) ...[
-                    Expanded(child: FilledButton(onPressed: onActivate, child: const Text('Activar'))),
-                    const SizedBox(width: 8),
-                    Expanded(child: FilledButton.tonal(onPressed: onShowCode, child: const Text('Mostrar código'))),
-                  ] else ...[
-                    Expanded(child: FilledButton.tonal(onPressed: onDeactivate, child: const Text('Desactivar'))),
-                    const SizedBox(width: 8),
-                    Expanded(child: FilledButton(onPressed: onShowCode, child: const Text('Mostrar código'))),
-                  ],
+                  // Header: logo + marca + estado
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      CircleAvatar(
+                        radius: 22,
+                        backgroundColor: Colors.white.withValues(alpha: 0.2),
+                        backgroundImage: NetworkImage(data.logoUrl),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          data.brand,
+                          style: const TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      if (isActive)
+                        const _ActivePill(),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // “Tarjeta” visual
+                  Container(
+                    height: 140,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                    ),
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Tarjeta de beneficios', style: TextStyle(color: Colors.white70)),
+                              SizedBox(height: 8),
+                              Text('Activá para usar en el comercio',
+                                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.credit_card, color: Colors.white),
+                      ],
+                    ),
+                  ),
+
+                  const Spacer(),
+
+                  // Acciones
+                  Row(
+                    children: [
+                      if (!isActive)
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: onActivate,
+                            child: const Text('Activar'),
+                          ),
+                        )
+                      else ...[
+                        Expanded(
+                          child: FilledButton.tonal(
+                            onPressed: onDeactivate,
+                            child: const Text('Desactivar'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Código/QR — próximamente')),
+                              );
+                            },
+                            child: const Text('Mostrar código'),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
-            ]),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -545,7 +576,7 @@ class _ActivePill extends StatelessWidget {
 }
 
 ////////////////////////////////////////////////////////////////
-/// PERFIL
+/// PERFIL (incluye detección de admin por Claims o Firestore)
 ////////////////////////////////////////////////////////////////
 class _ProfileTab extends StatelessWidget {
   const _ProfileTab();
@@ -555,9 +586,35 @@ class _ProfileTab extends StatelessWidget {
     if (s.isEmpty) return 'U';
     final parts = s.split(RegExp(r'\s+'));
     if (parts.length >= 2) {
-      return (parts[0].isNotEmpty ? parts[0][0] : 'U').toUpperCase() + (parts[1].isNotEmpty ? parts[1][0] : '');
+      return (parts[0].isNotEmpty ? parts[0][0] : 'U').toUpperCase() +
+          (parts[1].isNotEmpty ? parts[1][0] : '');
     }
     return s[0].toUpperCase();
+  }
+
+  /// Intenta detectar brandId primero por Custom Claims.
+  /// Si no hay, hace fallback a Firestore: collectionGroup('admins') donde el docId = UID.
+  Future<String?> _brandIdFromClaimsOrFirestore(User user) async {
+    try {
+      // 1) Claims
+      final token = await user.getIdTokenResult(true);
+      final claims = token.claims ?? {};
+      final fromClaims = claims['brandId'];
+      if (fromClaims is String && fromClaims.isNotEmpty) return fromClaims;
+
+      // 2) Firestore fallback (¡sin paréntesis!)
+      final q = await FirebaseFirestore.instance
+          .collectionGroup('admins')
+          .where(FieldPath.documentId, isEqualTo: user.uid)
+          .limit(1)
+          .get();
+
+      if (q.docs.isNotEmpty) {
+        final brandRef = q.docs.first.reference.parent.parent;
+        return brandRef?.id;
+      }
+    } catch (_) {}
+    return null;
   }
 
   @override
@@ -586,7 +643,8 @@ class _ProfileTab extends StatelessWidget {
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(name.isNotEmpty ? name : 'Usuario Weev', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
+                    Text(name.isNotEmpty ? name : 'Usuario Weev',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),
                     Text(email, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.black54)),
                   ]),
@@ -594,26 +652,68 @@ class _ProfileTab extends StatelessWidget {
                 FilledButton.icon(
                   icon: const Icon(Icons.edit),
                   label: const Text('Editar'),
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProfileEditScreen())),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ProfileEditScreen()),
+                  ),
                 )
               ],
             ),
           ),
         ),
         const SizedBox(height: 12),
+
+        // --- Admin de marca (claims o Firestore) ---
+        FutureBuilder<String?>(
+          future: _brandIdFromClaimsOrFirestore(user),
+          builder: (context, snap) {
+            final isLoading = snap.connectionState == ConnectionState.waiting;
+            final brandId = snap.data;
+
+            return Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: ListTile(
+                leading: const Icon(Icons.verified_user_outlined),
+                title: const Text('Admin de marca'),
+                subtitle: Text(
+                  isLoading
+                      ? 'Comprobando permisos…'
+                      : (brandId != null ? 'Tenés acceso a $brandId' : 'No sos admin de marca'),
+                ),
+                trailing: brandId != null ? const Icon(Icons.chevron_right) : null,
+                onTap: brandId == null
+                    ? null
+                    : () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => BrandAdminScreen(brandId: brandId),
+                          ),
+                        );
+                      },
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+
         Card(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Column(children: [
             ListTile(leading: const Icon(Icons.fingerprint), title: const Text('UID'), subtitle: Text(user.uid)),
             const Divider(height: 0),
-            ListTile(leading: const Icon(Icons.verified_user_outlined), title: const Text('Email verificado'), subtitle: Text(user.emailVerified ? 'Sí' : 'No')),
+            ListTile(
+              leading: const Icon(Icons.verified_user_outlined),
+              title: const Text('Email verificado'),
+              subtitle: Text(user.emailVerified ? 'Sí' : 'No'),
+            ),
           ]),
         ),
         const SizedBox(height: 12),
         FilledButton.tonalIcon(
           icon: const Icon(Icons.logout),
           label: const Text('Cerrar sesión'),
-          onPressed: () async => FirebaseAuth.instance.signOut(),
+          onPressed: () async {
+            await FirebaseAuth.instance.signOut();
+          },
         ),
       ],
     );
@@ -639,15 +739,8 @@ class _SwipeTabState extends State<_SwipeTab> {
   final List<_SwipeItem> _liked = [];
   final List<_SwipeItem> _passed = [];
 
-  void _onLike() {
-    if (_queue.isEmpty) return;
-    setState(() => _liked.add(_queue.removeAt(0)));
-  }
-
-  void _onNope() {
-    if (_queue.isEmpty) return;
-    setState(() => _passed.add(_queue.removeAt(0)));
-  }
+  void _onLike() { if (_queue.isEmpty) return; setState(() => _liked.add(_queue.removeAt(0))); }
+  void _onNope() { if (_queue.isEmpty) return; setState(() => _passed.add(_queue.removeAt(0))); }
 
   @override
   Widget build(BuildContext context) {
@@ -658,17 +751,7 @@ class _SwipeTabState extends State<_SwipeTab> {
           const SizedBox(height: 8),
           const Text('No hay más por hoy'),
           const SizedBox(height: 16),
-          FilledButton(
-            onPressed: () {
-              setState(() {
-                _queue.addAll(_liked);
-                _queue.addAll(_passed);
-                _liked.clear();
-                _passed.clear();
-              });
-            },
-            child: const Text('Reiniciar demo'),
-          ),
+          FilledButton(onPressed: () { setState(() { _queue.addAll(_liked); _queue.addAll(_passed); _liked.clear(); _passed.clear(); }); }, child: const Text('Reiniciar demo')),
         ]),
       );
     }
@@ -716,39 +799,15 @@ class _SwipeTabState extends State<_SwipeTab> {
       child: Dismissible(
         key: ValueKey(item.id),
         direction: DismissDirection.horizontal,
-        onDismissed: (dir) {
-          if (dir == DismissDirection.startToEnd) {
-            _onLike();
-          } else {
-            _onNope();
-          }
-        },
-        background: _swipeBackground(
-          align: Alignment.centerLeft,
-          icon: Icons.favorite,
-          color: Colors.green.withValues(alpha: 0.15),
-          iconColor: Colors.green,
-          label: 'LIKE',
-        ),
-        secondaryBackground: _swipeBackground(
-          align: Alignment.centerRight,
-          icon: Icons.close,
-          color: Colors.red.withValues(alpha: 0.15),
-          iconColor: Colors.red,
-          label: 'NOPE',
-        ),
+        onDismissed: (dir) { if (dir == DismissDirection.startToEnd) { _onLike(); } else { _onNope(); } },
+        background: _swipeBackground(align: Alignment.centerLeft, icon: Icons.favorite, color: Colors.green.withValues(alpha: 0.15), iconColor: Colors.green, label: 'LIKE'),
+        secondaryBackground: _swipeBackground(align: Alignment.centerRight, icon: Icons.close, color: Colors.red.withValues(alpha: 0.15), iconColor: Colors.red, label: 'NOPE'),
         child: Transform.scale(scale: scale, child: card),
       ),
     );
   }
 
-  Widget _swipeBackground({
-    required Alignment align,
-    required IconData icon,
-    required Color color,
-    required Color iconColor,
-    required String label,
-  }) {
+  Widget _swipeBackground({required Alignment align, required IconData icon, required Color color, required Color iconColor, required String label}) {
     return Container(
       alignment: align,
       decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(16)),
@@ -763,14 +822,11 @@ class _SwipeTabState extends State<_SwipeTab> {
 
   Widget _roundAction(BuildContext context, {required IconData icon, required String semantic, required VoidCallback onTap}) {
     return Semantics(
-      button: true,
-      label: semantic,
+      button: true, label: semantic,
       child: InkResponse(
-        onTap: onTap,
-        radius: 36,
+        onTap: onTap, radius: 36,
         child: Container(
-          width: 64,
-          height: 64,
+          width: 64, height: 64,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: Theme.of(context).colorScheme.surface,
@@ -794,9 +850,7 @@ class _SwipeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      clipBehavior: Clip.antiAlias,
+      elevation: 0, margin: EdgeInsets.zero, clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Column(
         children: [
@@ -817,23 +871,13 @@ class _SwipeCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(
-                item.brand,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700, color: Colors.black87),
-              ),
+              Text(item.brand, style: Theme.of(context).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700, color: Colors.black87)),
               const SizedBox(height: 4),
               Text(item.title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
               const SizedBox(height: 8),
               Wrap(
-                spacing: 8,
-                runSpacing: -6,
-                children: item.tags
-                    .map((t) => Chip(
-                          label: Text(t),
-                          visualDensity: VisualDensity.compact,
-                          side: const BorderSide(color: Color(0xFFE5E7EB)),
-                        ))
-                    .toList(),
+                spacing: 8, runSpacing: -6,
+                children: item.tags.map((t) => Chip(label: Text(t), visualDensity: VisualDensity.compact, side: const BorderSide(color: Color(0xFFE5E7EB)))).toList(),
               ),
             ]),
           ),
@@ -844,39 +888,20 @@ class _SwipeCard extends StatelessWidget {
 }
 
 class _SwipeItem {
-  final String id;
-  final String brand;
-  final String title;
-  final String imageUrl;
-  final List<String> tags;
+  final String id; final String brand; final String title; final String imageUrl; final List<String> tags;
   _SwipeItem({required this.id, required this.brand, required this.title, required this.imageUrl, required this.tags});
 }
 
-class _StoryData {
-  final String name;
-  final String imageUrl;
-  final bool isYou;
-  _StoryData({required this.name, required this.imageUrl, this.isYou = false});
-}
-
-class _PostData {
-  final String brand;
-  final String subtitle;
-  final String imageUrl;
-  final String cta;
-  _PostData({required this.brand, required this.subtitle, required this.imageUrl, required this.cta});
-}
+class _StoryData { final String name; final String imageUrl; final bool isYou; _StoryData({required this.name, required this.imageUrl, this.isYou = false}); }
+class _PostData { final String brand; final String subtitle; final String imageUrl; final String cta; _PostData({required this.brand, required this.subtitle, required this.imageUrl, required this.cta}); }
 
 class _StubPage extends StatelessWidget {
   const _StubPage({required this.title});
   final String title;
   @override
   Widget build(BuildContext context) => Center(
-        child: Text(
-          title,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-        ),
-      );
+    child: Text(title, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+  );
 }
+
 

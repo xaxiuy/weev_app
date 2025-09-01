@@ -1,1 +1,12 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"weev-27124","appId":"1:504564088502:android:e365959efb91923102f017","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"weev-27124","configurations":{"android":"1:504564088502:android:e365959efb91923102f017","ios":"1:504564088502:ios:def1ff5aa50ec3e902f017","macos":"1:504564088502:ios:def1ff5aa50ec3e902f017","web":"1:504564088502:web:c53402fac7c4b9c902f017","windows":"1:504564088502:web:63cdf394ae8d6bc902f017"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "functions": {
+    "source": "functions"
+  }
+}

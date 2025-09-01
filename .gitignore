@@ -33,3 +33,4 @@ web/.dart_tool/
 # Env
 .env
 *.env
+admin/serviceAccountKey.json
