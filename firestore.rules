@@ -1,0 +1,29 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Productos visibles (solo activos)
+    match /products/{productId} {
+      allow read: if resource.data.status == 'active';
+      allow write: if request.auth.token.brandId == resource.data.brandId;
+    }
+
+    // Códigos: no lectura pública del campo 'code'
+    match /activationCodes/{codeId} {
+      allow read: if false; // bloqueo lectura directa
+      allow write: if request.auth.token.brandId == request.resource.data.brandId;
+    }
+
+    // Activaciones del usuario
+    match /activations/{activationId} {
+      allow read, create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow update, delete: if false;
+    }
+
+    // Marcas
+    match /brands/{brandId} {
+      allow read: if true;
+      allow write: if request.auth.token.brandId == brandId;
+    }
+  }
+}

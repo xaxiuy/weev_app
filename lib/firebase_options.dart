@@ -72,4 +72,5 @@ class DefaultFirebaseOptions {
     iosClientId: '965858215724-vb5hv9mf5ojr9jp960dlqcud6tmhqh3e.apps.googleusercontent.com',
     iosBundleId: 'com.weev.app.weevApp',
   );
+
 }

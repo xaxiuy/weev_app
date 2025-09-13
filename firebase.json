@@ -1,1 +1,54 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"weev-app","appId":"1:965858215724:android:a27e2666d47b74bc0c0e89","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"weev-app","appId":"1:965858215724:ios:ecdaaf4b9e17fae40c0e89","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"weev-app","configurations":{"android":"1:965858215724:android:a27e2666d47b74bc0c0e89","ios":"1:965858215724:ios:ecdaaf4b9e17fae40c0e89","web":"1:965858215724:web:dc39fb5eb5666c6e0c0e89"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "weev-app",
+          "appId": "1:965858215724:android:a27e2666d47b74bc0c0e89",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "weev-app",
+          "appId": "1:965858215724:ios:ecdaaf4b9e17fae40c0e89",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "weev-app",
+          "configurations": {
+            "android": "1:965858215724:android:a27e2666d47b74bc0c0e89",
+            "ios": "1:965858215724:ios:ecdaaf4b9e17fae40c0e89",
+            "web": "1:965858215724:web:dc39fb5eb5666c6e0c0e89"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint",
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
+    }
+  ],
+  "firestore": {
+    "database": "(default)",
+    "location": "nam5",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}
