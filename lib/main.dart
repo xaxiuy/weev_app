@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
-import 'theme/app_theme.dart';
 import 'app/app_router.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,15 +12,15 @@ void main() async {
   runApp(const ProviderScope(child: WeevApp()));
 }
 
-class WeevApp extends ConsumerWidget {
+class WeevApp extends StatelessWidget {
   const WeevApp({super.key});
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final router = ref.watch(routerProvider);
+  Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Weev',
       theme: AppTheme.light,
-      routerConfig: router,
+      routerConfig: appRouter,
     );
   }
 }
